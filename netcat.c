@@ -128,7 +128,7 @@ main(int argc, char *argv[])
 	struct servent *sv;
 	socklen_t len;
 	struct sockaddr_storage cliaddr;
-	char *proxy;
+	char *proxy = NULL;
 	const char *proxyhost = "", *proxyport = NULL;
 	struct addrinfo proxyhints;
 	char unix_dg_tmp_socket_buf[UNIX_DG_TMP_SOCKET_SIZE];

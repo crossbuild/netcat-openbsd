@@ -274,17 +274,17 @@ socks_connect(const char *host, const char *port,
 
 		/* Try to be sane about numeric IPv6 addresses */
 		if (strchr(host, ':') != NULL) {
-			r = snprintf(buf, sizeof(buf),
+			r = snprintf((char*)buf, sizeof(buf),
 			    "CONNECT [%s]:%d HTTP/1.0\r\n",
 			    host, ntohs(serverport));
 		} else {
-			r = snprintf(buf, sizeof(buf),
+			r = snprintf((char*)buf, sizeof(buf),
 			    "CONNECT %s:%d HTTP/1.0\r\n",
 			    host, ntohs(serverport));
 		}
 		if (r == -1 || (size_t)r >= sizeof(buf))
 			errx(1, "hostname too long");
-		r = strlen(buf);
+		r = strlen((char*)buf);
 
 		cnt = atomicio(vwrite, proxyfd, buf, r);
 		if (cnt != r)
@@ -294,17 +294,17 @@ socks_connect(const char *host, const char *port,
 			char resp[1024];
 
 			proxypass = getproxypass(proxyuser, proxyhost);
-			r = snprintf(buf, sizeof(buf), "%s:%s",
+			r = snprintf((char*)buf, sizeof(buf), "%s:%s",
 			    proxyuser, proxypass);
 			if (r == -1 || (size_t)r >= sizeof(buf) ||
-			    b64_ntop(buf, strlen(buf), resp,
+			    b64_ntop(buf, strlen((char*)buf), resp,
 			    sizeof(resp)) == -1)
 				errx(1, "Proxy username/password too long");
-			r = snprintf(buf, sizeof(buf), "Proxy-Authorization: "
+			r = snprintf((char*)buf, sizeof((char*)buf), "Proxy-Authorization: "
 			    "Basic %s\r\n", resp);
 			if (r == -1 || (size_t)r >= sizeof(buf))
 				errx(1, "Proxy auth response too long");
-			r = strlen(buf);
+			r = strlen((char*)buf);
 			if ((cnt = atomicio(vwrite, proxyfd, buf, r)) != r)
 				err(1, "write failed (%zu/%d)", cnt, r);
 		}
@@ -314,22 +314,22 @@ socks_connect(const char *host, const char *port,
 			err(1, "write failed (2/%d)", r);
 
 		/* Read status reply */
-		proxy_read_line(proxyfd, buf, sizeof(buf));
+		proxy_read_line(proxyfd, (char*)buf, sizeof(buf));
 		if (proxyuser != NULL &&
-		    strncmp(buf, "HTTP/1.0 407 ", 12) == 0) {
+		    strncmp((char*)buf, "HTTP/1.0 407 ", 12) == 0) {
 			if (authretry > 1) {
 				fprintf(stderr, "Proxy authentication "
 				    "failed\n");
 			}
 			close(proxyfd);
 			goto again;
-		} else if (strncmp(buf, "HTTP/1.0 200 ", 12) != 0 &&
-		    strncmp(buf, "HTTP/1.1 200 ", 12) != 0)
+		} else if (strncmp((char*)buf, "HTTP/1.0 200 ", 12) != 0 &&
+		    strncmp((char*)buf, "HTTP/1.1 200 ", 12) != 0)
 			errx(1, "Proxy error: \"%s\"", buf);
 
 		/* Headers continue until we hit an empty line */
 		for (r = 0; r < HTTP_MAXHDRS; r++) {
-			proxy_read_line(proxyfd, buf, sizeof(buf));
+			proxy_read_line(proxyfd, (char*)buf, sizeof(buf));
 			if (*buf == '\0')
 				break;
 		}
