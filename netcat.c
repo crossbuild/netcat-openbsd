@@ -1022,6 +1022,7 @@ map_tos(char *s, int *val)
 void
 help(void)
 {
+	fprintf(stderr, "OpenBSD netcat (SUSE Linux)\n");
 	usage(0);
 	fprintf(stderr, "\tCommand Summary:\n\
 	\t-4		Use IPv4\n\
@@ -1054,7 +1055,7 @@ help(void)
 	\t-x addr[:port]\tSpecify proxy address and port\n\
 	\t-z		Zero-I/O mode [used for scanning]\n\
 	Port numbers can be individual or ranges: lo-hi [inclusive]\n");
-	exit(1);
+	exit(0);
 }
 
 void
