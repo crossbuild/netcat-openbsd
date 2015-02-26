@@ -744,9 +744,7 @@ readwrite(int nfd)
 			if ((n = read(nfd, buf, plen)) < 0)
 				return;
 			else if (n == 0) {
-				shutdown(nfd, SHUT_RD);
-				pfd[0].fd = -1;
-				pfd[0].events = 0;
+				goto shutdown_rd;
 			} else {
 				if (tflag)
 					atelnet(nfd, buf, n);
@@ -754,18 +752,30 @@ readwrite(int nfd)
 					return;
 			}
 		}
+		else if (pfd[0].revents & POLLHUP) {
+		shutdown_rd:
+			shutdown(nfd, SHUT_RD);
+			pfd[0].fd = -1;
+			pfd[0].events = 0;
+		}
 
-		if (!dflag && pfd[1].revents & POLLIN) {
+		if (!dflag) {
+		    if(pfd[1].revents & POLLIN) {
 			if ((n = read(wfd, buf, plen)) < 0)
 				return;
 			else if (n == 0) {
-				shutdown(nfd, SHUT_WR);
-				pfd[1].fd = -1;
-				pfd[1].events = 0;
+				goto shutdown_wr;
 			} else {
 				if (atomicio(vwrite, nfd, buf, n) != n)
 					return;
 			}
+		    }
+		    else if (pfd[1].revents & POLLHUP) {
+		    shutdown_wr:
+			shutdown(nfd, SHUT_WR);
+			pfd[1].fd = -1;
+			pfd[1].events = 0;
+		    }
 		}
 	}
 }
