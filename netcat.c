@@ -66,6 +66,8 @@
 #define PORT_MAX_LEN	6
 #define UNIX_DG_TMP_SOCKET_SIZE	19
 
+#define UDP_SCAN_TIMEOUT 3			/* Seconds */
+
 /* Command Line Options */
 int	dflag;					/* detached, no stdin */
 int	iflag;					/* Interval Flag */
@@ -423,7 +425,7 @@ main(int argc, char *argv[])
 				continue;
 
 			ret = 0;
-			if (vflag) {
+			if (vflag && !uflag) {
 				/* For UDP, make sure we are connected. */
 				if (uflag) {
 					if (udptest(s) == -1) {
@@ -885,15 +887,20 @@ build_ports(char *p)
 int
 udptest(int s)
 {
-	int i, ret;
+	int i, t;
 
-	for (i = 0; i <= 3; i++) {
-		if (write(s, "X", 1) == 1)
-			ret = 1;
-		else
-			ret = -1;
+	if ((write(s, "X", 1) != 1) ||
+	    ((write(s, "X", 1) != 1) && (errno == ECONNREFUSED)))
+		return -1;
+
+	/* Give the remote host some time to reply. */
+	for (i = 0, t = (timeout == -1) ? UDP_SCAN_TIMEOUT : (timeout / 1000);
+	     i < t; i++) {
+		sleep(1);
+		if ((write(s, "X", 1) != 1) && (errno == ECONNREFUSED))
+			return -1;
 	}
-	return (ret);
+	return 1;
 }
 
 void
