@@ -422,7 +422,7 @@ main(int argc, char *argv[])
 				continue;
 
 			ret = 0;
-			if (vflag || zflag) {
+			if (vflag) {
 				/* For UDP, make sure we are connected. */
 				if (uflag) {
 					if (udptest(s) == -1) {
