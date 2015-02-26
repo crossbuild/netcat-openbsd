@@ -85,6 +85,7 @@ int	rflag;					/* Random ports flag */
 char   *sflag;					/* Source Address */
 int	tflag;					/* Telnet Emulation */
 int	uflag;					/* UDP - Default to TCP */
+int	dccpflag;				/* DCCP - Default to TCP */
 int	vflag;					/* Verbosity */
 int	xflag;					/* Socks proxy */
 int	zflag;					/* Port Scan Flag */
@@ -116,6 +117,7 @@ int	unix_listen(char *);
 void	set_common_sockopts(int);
 int	map_tos(char *, int *);
 void	usage(int);
+char    *proto_name(int uflag, int dccpflag);
 
 static void quit();
 
@@ -142,7 +144,7 @@ main(int argc, char *argv[])
 	sv = NULL;
 
 	while ((ch = getopt(argc, argv,
-	    "46DdhI:i:jklnO:P:p:q:rSs:tT:UuV:vw:X:x:zC")) != -1) {
+	    "46DdhI:i:jklnO:P:p:q:rSs:tT:UuZV:vw:X:x:zC")) != -1) {
 		switch (ch) {
 		case '4':
 			family = AF_INET;
@@ -207,6 +209,8 @@ main(int argc, char *argv[])
 		case 'u':
 			uflag = 1;
 			break;
+		case 'Z':
+			dccpflag = 1;
 		case 'V':
 			rtableid = (unsigned int)strtonum(optarg, 0,
 			    RT_TABLEID_MAX, &errstr);
@@ -272,6 +276,9 @@ main(int argc, char *argv[])
 
 	/* Cruft to make sure options are clean, and used properly. */
 	if (argv[0] && !argv[1] && family == AF_UNIX) {
+		if (dccpflag)
+			errx(1, "cannot use -C and -U");
+
 		host = argv[0];
 		uport = NULL;
 	} else if (argv[0] && !argv[1]) {
@@ -311,8 +318,18 @@ main(int argc, char *argv[])
 	if (family != AF_UNIX) {
 		memset(&hints, 0, sizeof(struct addrinfo));
 		hints.ai_family = family;
-		hints.ai_socktype = uflag ? SOCK_DGRAM : SOCK_STREAM;
-		hints.ai_protocol = uflag ? IPPROTO_UDP : IPPROTO_TCP;
+		if (uflag) {
+		    hints.ai_socktype = SOCK_DGRAM;
+		    hints.ai_protocol = IPPROTO_UDP;
+		}
+		else if (dccpflag) {
+		    hints.ai_socktype = SOCK_DCCP;
+		    hints.ai_protocol = IPPROTO_DCCP;
+		}
+		else {
+		    hints.ai_socktype = SOCK_STREAM;
+		    hints.ai_protocol = IPPROTO_TCP;
+		}
 		if (nflag)
 			hints.ai_flags |= AI_NUMERICHOST;
 	}
@@ -320,6 +337,9 @@ main(int argc, char *argv[])
 	if (xflag) {
 		if (uflag)
 			errx(1, "no proxy support for UDP mode");
+
+		if (dccpflag)
+			errx(1, "no proxy support for DCCP mode");
 
 		if (lflag)
 			errx(1, "no proxy support for listen");
@@ -392,17 +412,19 @@ main(int argc, char *argv[])
 			}
 
 			if(vflag) {
+				char *proto = proto_name(uflag, dccpflag);
+
 				/* Don't look up port if -n. */
 				if (nflag)
 					sv = NULL;
 				else 
 					sv = getservbyport(ntohs(atoi(uport)),
-						uflag ? "udp" : "tcp");
+						proto);
 
 				fprintf(stderr, "Connection from %s port %s [%s/%s] accepted\n", 
 					inet_ntoa(((struct sockaddr_in *)(&cliaddr))->sin_addr),
 					uport,
-					uflag ? "udp" : "tcp", 
+					proto,
 					sv ? sv->s_name : "*");
 			}
 
@@ -572,6 +594,22 @@ unix_listen(char *path)
 	return (s);
 }
 
+char *proto_name(uflag, dccpflag) {
+
+    char *proto = NULL;
+    if (uflag) {
+	proto = "udp";
+    }
+    else if (dccpflag) {
+	proto = "dccp";
+    }
+    else {
+	proto = "tcp";
+    }
+
+    return proto;
+}
+
 /*
  * remote_connect()
  * Returns a socket connected to a remote host. Properly binds to a local
@@ -606,8 +644,19 @@ remote_connect(const char *host, const char *port, struct addrinfo hints)
 			setsockopt(s, SOL_SOCKET, SO_BINDANY, &on, sizeof(on));
 			memset(&ahints, 0, sizeof(struct addrinfo));
 			ahints.ai_family = res0->ai_family;
-			ahints.ai_socktype = uflag ? SOCK_DGRAM : SOCK_STREAM;
-			ahints.ai_protocol = uflag ? IPPROTO_UDP : IPPROTO_TCP;
+			if (uflag) {
+			    ahints.ai_socktype = SOCK_DGRAM;
+			    ahints.ai_protocol = IPPROTO_UDP;
+
+			}
+			else if (dccpflag) {
+			    ahints.ai_socktype = SOCK_DCCP;
+			    ahints.ai_protocol = IPPROTO_DCCP;
+			}
+			else {
+		    	    ahints.ai_socktype = SOCK_STREAM;
+			    ahints.ai_protocol = IPPROTO_TCP;
+			}
 			ahints.ai_flags = AI_PASSIVE;
 			if ((error = getaddrinfo(sflag, pflag, &ahints, &ares)))
 				errx(1, "getaddrinfo: %s", gai_strerror(error));
@@ -620,11 +669,13 @@ remote_connect(const char *host, const char *port, struct addrinfo hints)
 
 		set_common_sockopts(s);
 
+		char *proto = proto_name(uflag, dccpflag);
+
 		if (timeout_connect(s, res0->ai_addr, res0->ai_addrlen) == 0)
 			break;
 		else if (vflag)
 			warn("connect to %s port %s (%s) failed", host, port,
-			    uflag ? "udp" : "tcp");
+			    proto);
 
 		close(s);
 		s = -1;
@@ -869,8 +920,8 @@ build_ports(char *p)
 	char *n, *endp;
 	int hi, lo, cp;
 	int x = 0;
-
-	sv = getservbyname(p, uflag ? "udp" : "tcp");
+	char *proto = proto_name(uflag, dccpflag);
+	sv = getservbyname(p, proto);
 	if (sv) {
 		portlist[0] = calloc(1, PORT_MAX_LEN);
 		if (portlist[0] == NULL)
@@ -1069,6 +1120,7 @@ help(void)
 	\t-t		Answer TELNET negotiation\n\
 	\t-U		Use UNIX domain socket\n\
 	\t-u		UDP mode\n\
+	\t-Z		DCCP mode\n\
 	\t-V rtable	Specify alternate routing table\n\
 	\t-v		Verbose\n\
 	\t-w secs\t	Timeout for connects and final net reads\n\
