@@ -865,11 +865,18 @@ atelnet(int nfd, unsigned char *buf, unsigned int size)
 void
 build_ports(char *p)
 {
+	struct servent *sv;
 	char *n, *endp;
 	int hi, lo, cp;
 	int x = 0;
 
-	if ((n = strchr(p, '-')) != NULL) {
+	sv = getservbyname(p, uflag ? "udp" : "tcp");
+	if (sv) {
+		portlist[0] = calloc(1, PORT_MAX_LEN);
+		if (portlist[0] == NULL)
+			err(1, NULL);
+		snprintf(portlist[0], PORT_MAX_LEN, "%d", ntohs(sv->s_port));
+	} else if ((n = strchr(p, '-')) != NULL) {
 		*n = '\0';
 		n++;
 
