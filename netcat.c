@@ -680,6 +680,10 @@ local_listen(char *host, char *port, struct addrinfo hints)
 			    sizeof(rtableid)) == -1)
 				err(1, "setsockopt SO_RTABLE");
 		}
+
+		ret = setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &x, sizeof(x));
+		if (ret == -1)
+			err(1, NULL);
 		#ifdef SO_REUSEPORT
 		ret = setsockopt(s, SOL_SOCKET, SO_REUSEPORT, &x, sizeof(x));
 		if (ret == -1)
