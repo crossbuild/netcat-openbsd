@@ -41,6 +41,7 @@
 #include <netinet/tcp.h>
 #include <netinet/ip.h>
 #include <arpa/telnet.h>
+#include <arpa/inet.h>
 
 #include <err.h>
 #include <errno.h>
@@ -358,16 +359,15 @@ main(int argc, char *argv[])
 			if (uflag) {
 				int rv, plen;
 				char buf[16384];
-				struct sockaddr_storage z;
 
-				len = sizeof(z);
+				len = sizeof(cliaddr);
 				plen = jflag ? 16384 : 2048;
 				rv = recvfrom(s, buf, plen, MSG_PEEK,
-				    (struct sockaddr *)&z, &len);
+				    (struct sockaddr *)&cliaddr, &len);
 				if (rv < 0)
 					err(1, "recvfrom");
 
-				rv = connect(s, (struct sockaddr *)&z, len);
+				rv = connect(s, (struct sockaddr *)&cliaddr, len);
 				if (rv < 0)
 					err(1, "connect");
 
@@ -378,6 +378,21 @@ main(int argc, char *argv[])
 				    &len);
 				readwrite(connfd);
 				close(connfd);
+			}
+
+			if(vflag) {
+				/* Don't look up port if -n. */
+				if (nflag)
+					sv = NULL;
+				else 
+					sv = getservbyport(ntohs(atoi(uport)),
+						uflag ? "udp" : "tcp");
+
+				fprintf(stderr, "Connection from %s port %s [%s/%s] accepted\n", 
+					inet_ntoa(((struct sockaddr_in *)(&cliaddr))->sin_addr),
+					uport,
+					uflag ? "udp" : "tcp", 
+					sv ? sv->s_name : "*");
 			}
 
 			if (family != AF_UNIX)
