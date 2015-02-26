@@ -34,7 +34,7 @@
 .Sh SYNOPSIS
 .Nm nc
 .Bk -words
-.Op Fl 46DdhklnrStUuvz
+.Op Fl 46DdhklnrStUuvzC
 .Op Fl I Ar length
 .Op Fl i Ar interval
 .Op Fl O Ar length
@@ -149,6 +149,10 @@ should use, subject to privilege restrictions and availability.
 It is an error to use this option in conjunction with the
 .Fl l
 option.
+.It Fl q
+after EOF on stdin, wait the specified number of seconds and then quit. If
+.Ar seconds
+is negative, wait forever.
 .It Fl r
 Specifies that source and/or destination ports should be chosen randomly
 instead of sequentially within a range or in the order that the system
@@ -179,6 +183,8 @@ or one of the DiffServ Code Points:
 .Ar af11 ... af43 ,
 .Ar cs0 ... cs7 ;
 or a number in either hex or decimal.
+.It Fl C 
+Send CRLF as line-ending
 .It Fl t
 Causes
 .Nm
@@ -357,7 +363,7 @@ More complicated examples can be built up when the user knows the format
 of requests required by the server.
 As another example, an email may be submitted to an SMTP server using:
 .Bd -literal -offset indent
-$ nc localhost 25 \*(Lt\*(Lt EOF
+$ nc [-C] localhost 25 \*(Lt\*(Lt EOF
 HELO host.example.com
 MAIL FROM:\*(Ltuser@host.example.com\*(Gt
 RCPT TO:\*(Ltuser2@host.example.com\*(Gt

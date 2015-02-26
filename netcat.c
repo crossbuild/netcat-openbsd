@@ -70,6 +70,7 @@
 #define UDP_SCAN_TIMEOUT 3			/* Seconds */
 
 /* Command Line Options */
+int	Cflag = 0;				/* CRLF line-ending */
 int	dflag;					/* detached, no stdin */
 int	iflag;					/* Interval Flag */
 int	jflag;					/* use jumbo frames if we can */
@@ -137,7 +138,7 @@ main(int argc, char *argv[])
 	sv = NULL;
 
 	while ((ch = getopt(argc, argv,
-	    "46DdhI:i:jklnO:P:p:rSs:tT:UuV:vw:X:x:z")) != -1) {
+	    "46DdhI:i:jklnO:P:p:rSs:tT:UuV:vw:X:x:zC")) != -1) {
 		switch (ch) {
 		case '4':
 			family = AF_INET;
@@ -251,6 +252,9 @@ main(int argc, char *argv[])
 				Tflag = (int)strtoul(optarg, &endp, 10);
 			if (Tflag < 0 || Tflag > 255 || *endp != '\0' || errno)
 				errx(1, "illegal tos value %s", optarg);
+			break;
+		case 'C':
+			Cflag = 1;
 			break;
 		default:
 			usage(1);
@@ -787,8 +791,16 @@ readwrite(int nfd)
 			else if (n == 0) {
 				goto shutdown_wr;
 			} else {
-				if (atomicio(vwrite, nfd, buf, n) != n)
-					return;
+				if ((Cflag) && (buf[n-1]=='\n')) {
+					if (atomicio(vwrite, nfd, buf, n-1) != (n-1))
+						return;
+					if (atomicio(vwrite, nfd, "\r\n", 2) != 2)
+						return;
+				}
+				else {
+					if (atomicio(vwrite, nfd, buf, n) != n)
+						return;
+				}
 			}
 		    }
 		    else if (pfd[1].revents & POLLHUP) {
@@ -1031,6 +1043,7 @@ help(void)
 #endif
 "	\t-s addr\t	Local source address\n\
 	\t-T toskeyword\tSet IP Type of Service\n\
+	\t-C		Send CRLF as line-ending\n\
 	\t-t		Answer TELNET negotiation\n\
 	\t-U		Use UNIX domain socket\n\
 	\t-u		UDP mode\n\
@@ -1048,7 +1061,7 @@ void
 usage(int ret)
 {
 	fprintf(stderr,
-	    "usage: nc [-46DdhklnrStUuvz] [-I length] [-i interval] [-O length]\n"
+	    "usage: nc [-46DdhklnrStUuvzC] [-I length] [-i interval] [-O length]\n"
 	    "\t  [-P proxy_username] [-p source_port] [-s source] [-T ToS]\n"
 	    "\t  [-V rtable] [-w timeout] [-X proxy_protocol]\n"
 	    "\t  [-x proxy_address[:port]] [destination] [port]\n");
