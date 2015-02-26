@@ -47,6 +47,7 @@
 #include <errno.h>
 #include <netdb.h>
 #include <poll.h>
+#include <signal.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -79,6 +80,7 @@ int	lflag;					/* Bind to local port */
 int	nflag;					/* Don't do name look up */
 char   *Pflag;					/* Proxy username */
 char   *pflag;					/* Localport flag */
+int	qflag = -1;				/* Quit after some secs */
 int	rflag;					/* Random ports flag */
 char   *sflag;					/* Source Address */
 int	tflag;					/* Telnet Emulation */
@@ -115,6 +117,8 @@ void	set_common_sockopts(int);
 int	map_tos(char *, int *);
 void	usage(int);
 
+static void quit();
+
 int
 main(int argc, char *argv[])
 {
@@ -138,7 +142,7 @@ main(int argc, char *argv[])
 	sv = NULL;
 
 	while ((ch = getopt(argc, argv,
-	    "46DdhI:i:jklnO:P:p:rSs:tT:UuV:vw:X:x:zC")) != -1) {
+	    "46DdhI:i:jklnO:P:p:q:rSs:tT:UuV:vw:X:x:zC")) != -1) {
 		switch (ch) {
 		case '4':
 			family = AF_INET;
@@ -187,6 +191,9 @@ main(int argc, char *argv[])
 			break;
 		case 'p':
 			pflag = optarg;
+			break;
+		case 'q':
+			qflag = (int)strtoul(optarg, &endp, 10);
 			break;
 		case 'r':
 			rflag = 1;
@@ -805,7 +812,13 @@ readwrite(int nfd)
 		    }
 		    else if (pfd[1].revents & POLLHUP) {
 		    shutdown_wr:
-			shutdown(nfd, SHUT_WR);
+			/* if user asked to die after a while, arrange for it */
+			if (qflag > 0) {
+				 signal(SIGALRM, quit);
+				 alarm(qflag);
+			} else {
+				 shutdown(nfd, SHUT_WR);
+                        }
 			pfd[1].fd = -1;
 			pfd[1].events = 0;
 		    }
@@ -1038,6 +1051,7 @@ help(void)
 	\t-O length	TCP send buffer length\n\
 	\t-P proxyuser\tUsername for proxy authentication\n\
 	\t-p port\t	Specify local port for remote connects\n\
+	\t-q secs\t	quit after EOF on stdin and delay of secs\n\
 	\t-r		Randomize remote ports\n "
 #ifdef TCP_MD5SIG
 "	\t-S		Enable the TCP MD5 signature option\n"
@@ -1068,4 +1082,14 @@ usage(int ret)
 	    "\t  [-x proxy_address[:port]] [destination] [port]\n");
 	if (ret)
 		exit(1);
+}
+
+/*
+ * quit()
+ * handler for a "-q" timeout (exit 0 instead of 1)
+ */
+static void quit()
+{
+	/* XXX: should explicitly close fds here */
+	exit(0);
 }
