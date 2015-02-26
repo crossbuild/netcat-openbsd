@@ -68,7 +68,7 @@
 
 /* Command Line Options */
 int	dflag;					/* detached, no stdin */
-unsigned int iflag;				/* Interval Flag */
+int	iflag;					/* Interval Flag */
 int	jflag;					/* use jumbo frames if we can */
 int	kflag;					/* More than one connect */
 int	lflag;					/* Bind to local port */
@@ -115,13 +115,13 @@ int
 main(int argc, char *argv[])
 {
 	int ch, s, ret, socksv;
-	char *host, *uport;
+	char *host, *uport, *endp;
 	struct addrinfo hints;
 	struct servent *sv;
 	socklen_t len;
 	struct sockaddr_storage cliaddr;
 	char *proxy;
-	const char *errstr, *proxyhost = "", *proxyport = NULL;
+	const char *proxyhost = "", *proxyport = NULL;
 	struct addrinfo proxyhints;
 	char unix_dg_tmp_socket_buf[UNIX_DG_TMP_SOCKET_SIZE];
 
@@ -130,6 +130,7 @@ main(int argc, char *argv[])
 	socksv = 5;
 	host = NULL;
 	uport = NULL;
+	endp = NULL;
 	sv = NULL;
 
 	while ((ch = getopt(argc, argv,
@@ -161,9 +162,9 @@ main(int argc, char *argv[])
 			help();
 			break;
 		case 'i':
-			iflag = strtonum(optarg, 0, UINT_MAX, &errstr);
-			if (errstr)
-				errx(1, "interval %s: %s", errstr, optarg);
+			iflag = (int)strtoul(optarg, &endp, 10);
+			if (iflag < 0 || *endp != '\0')
+				errx(1, "interval cannot be negative");
 			break;
 		case 'j':
 			jflag = 1;
@@ -205,9 +206,11 @@ main(int argc, char *argv[])
 			vflag = 1;
 			break;
 		case 'w':
-			timeout = strtonum(optarg, 0, INT_MAX / 1000, &errstr);
-			if (errstr)
-				errx(1, "timeout %s: %s", errstr, optarg);
+			timeout = (int)strtoul(optarg, &endp, 10);
+			if (timeout < 0 || *endp != '\0')
+				errx(1, "timeout cannot be negative");
+			if (timeout >= (INT_MAX / 1000))
+				errx(1, "timeout too large");
 			timeout *= 1000;
 			break;
 		case 'x':
@@ -222,32 +225,28 @@ main(int argc, char *argv[])
 			Dflag = 1;
 			break;
 		case 'I':
-			Iflag = strtonum(optarg, 1, 65536 << 14, &errstr);
-			if (errstr != NULL)
-				errx(1, "TCP receive window %s: %s",
-				    errstr, optarg);
+			Iflag = (int)strtoul(optarg, &endp, 10);
+			if (Iflag <= 0 || Iflag > (65536 << 14) || *endp != '\0')
+				errx(1, "TCP receive window range not valid");
 			break;
 		case 'O':
-			Oflag = strtonum(optarg, 1, 65536 << 14, &errstr);
-			if (errstr != NULL)
-				errx(1, "TCP send window %s: %s",
-				    errstr, optarg);
+			Oflag = (int)strtoul(optarg, &endp, 10);
+			if (Oflag <= 0 || Oflag > (65536 << 14) || *endp != '\0')
+				errx(1, "TCP send window range not valid");
 			break;
 		case 'S':
 			Sflag = 1;
 			break;
 		case 'T':
-			errstr = NULL;
 			errno = 0;
 			if (map_tos(optarg, &Tflag))
 				break;
 			if (strlen(optarg) > 1 && optarg[0] == '0' &&
 			    optarg[1] == 'x')
-				Tflag = (int)strtol(optarg, NULL, 16);
+				Tflag = (int)strtol(optarg, &endp, 16);
 			else
-				Tflag = (int)strtonum(optarg, 0, 255,
-				    &errstr);
-			if (Tflag < 0 || Tflag > 255 || errstr || errno)
+				Tflag = (int)strtoul(optarg, &endp, 10);
+			if (Tflag < 0 || Tflag > 255 || *endp != '\0' || errno)
 				errx(1, "illegal tos value %s", optarg);
 			break;
 		default:
@@ -810,8 +809,7 @@ atelnet(int nfd, unsigned char *buf, unsigned int size)
 void
 build_ports(char *p)
 {
-	const char *errstr;
-	char *n;
+	char *n, *endp;
 	int hi, lo, cp;
 	int x = 0;
 
@@ -820,12 +818,12 @@ build_ports(char *p)
 		n++;
 
 		/* Make sure the ports are in order: lowest->highest. */
-		hi = strtonum(n, 1, PORT_MAX, &errstr);
-		if (errstr)
-			errx(1, "port number %s: %s", errstr, n);
-		lo = strtonum(p, 1, PORT_MAX, &errstr);
-		if (errstr)
-			errx(1, "port number %s: %s", errstr, p);
+		hi = (int)strtoul(n, &endp, 10);
+		if (hi <= 0 || hi > PORT_MAX || *endp != '\0')
+			errx(1, "port range not valid");
+		lo = (int)strtoul(p, &endp, 10);
+		if (lo <= 0 || lo > PORT_MAX || *endp != '\0')
+			errx(1, "port range not valid");
 
 		if (lo > hi) {
 			cp = hi;
@@ -856,9 +854,9 @@ build_ports(char *p)
 			}
 		}
 	} else {
-		hi = strtonum(p, 1, PORT_MAX, &errstr);
-		if (errstr)
-			errx(1, "port number %s: %s", errstr, p);
+		hi = (int)strtoul(p, &endp, 10);
+		if (hi <= 0 || hi > PORT_MAX || *endp != '\0')
+			errx(1, "port range not valid");
 		portlist[0] = strdup(p);
 		if (portlist[0] == NULL)
 			err(1, NULL);
