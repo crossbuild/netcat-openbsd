@@ -55,6 +55,8 @@
 #include <limits.h>
 #include "atomicio.h"
 
+#define strlcpy(d,s,n) snprintf((d),(n),"%s",(s))
+
 #ifndef SUN_LEN
 #define SUN_LEN(su) \
 	(sizeof(*(su)) - sizeof((su)->sun_path) + strlen((su)->sun_path))
@@ -679,11 +681,11 @@ local_listen(char *host, char *port, struct addrinfo hints)
 			    sizeof(rtableid)) == -1)
 				err(1, "setsockopt SO_RTABLE");
 		}
-
+		#ifdef SO_REUSEPORT
 		ret = setsockopt(s, SOL_SOCKET, SO_REUSEPORT, &x, sizeof(x));
 		if (ret == -1)
 			err(1, NULL);
-
+		#endif
 		set_common_sockopts(s);
 
 		if (bind(s, (struct sockaddr *)res0->ai_addr,
@@ -846,7 +848,8 @@ build_ports(char *p)
 			char *c;
 
 			for (x = 0; x <= (hi - lo); x++) {
-				y = (arc4random() & 0xFFFF) % (hi - lo);
+				/* use random instead of arc4random */
+				y = (random() & 0xFFFF) % (hi - lo);
 				c = portlist[x];
 				portlist[x] = portlist[y];
 				portlist[y] = c;
@@ -886,21 +889,25 @@ set_common_sockopts(int s)
 {
 	int x = 1;
 
+#ifdef TCP_MD5SIG
 	if (Sflag) {
 		if (setsockopt(s, IPPROTO_TCP, TCP_MD5SIG,
 			&x, sizeof(x)) == -1)
 			err(1, NULL);
 	}
+#endif
 	if (Dflag) {
 		if (setsockopt(s, SOL_SOCKET, SO_DEBUG,
 			&x, sizeof(x)) == -1)
 			err(1, NULL);
 	}
+#ifdef SO_JUMBO
 	if (jflag) {
 		if (setsockopt(s, SOL_SOCKET, SO_JUMBO,
 			&x, sizeof(x)) == -1)
 			err(1, NULL);
 	}
+#endif
 	if (Tflag != -1) {
 		if (setsockopt(s, IPPROTO_IP, IP_TOS,
 		    &Tflag, sizeof(Tflag)) == -1)
@@ -984,9 +991,11 @@ help(void)
 	\t-O length	TCP send buffer length\n\
 	\t-P proxyuser\tUsername for proxy authentication\n\
 	\t-p port\t	Specify local port for remote connects\n\
-	\t-r		Randomize remote ports\n\
-	\t-S		Enable the TCP MD5 signature option\n\
-	\t-s addr\t	Local source address\n\
+	\t-r		Randomize remote ports\n "
+#ifdef TCP_MD5SIG
+"	\t-S		Enable the TCP MD5 signature option\n"
+#endif
+"	\t-s addr\t	Local source address\n\
 	\t-T toskeyword\tSet IP Type of Service\n\
 	\t-t		Answer TELNET negotiation\n\
 	\t-U		Use UNIX domain socket\n\
