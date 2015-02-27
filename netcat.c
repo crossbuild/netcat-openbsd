@@ -651,8 +651,10 @@ remote_connect(const char *host, const char *port, struct addrinfo hints)
 		if (sflag || pflag) {
 			struct addrinfo ahints, *ares;
 
+#ifdef SO_BINDANY
 			/* try SO_BINDANY, but don't insist */
 			setsockopt(s, SOL_SOCKET, SO_BINDANY, &on, sizeof(on));
+#endif
 			memset(&ahints, 0, sizeof(struct addrinfo));
 			ahints.ai_family = res0->ai_family;
 			if (uflag) {
