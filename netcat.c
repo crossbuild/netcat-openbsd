@@ -1063,6 +1063,7 @@ map_tos(char *s, int *val)
 		{ "af42",		IPTOS_DSCP_AF42 },
 		{ "af43",		IPTOS_DSCP_AF43 },
 		{ "critical",		IPTOS_PREC_CRITIC_ECP },
+#ifdef HAVE_IPTOS_DSCP_CSX
 		{ "cs0",		IPTOS_DSCP_CS0 },
 		{ "cs1",		IPTOS_DSCP_CS1 },
 		{ "cs2",		IPTOS_DSCP_CS2 },
@@ -1071,6 +1072,7 @@ map_tos(char *s, int *val)
 		{ "cs5",		IPTOS_DSCP_CS5 },
 		{ "cs6",		IPTOS_DSCP_CS6 },
 		{ "cs7",		IPTOS_DSCP_CS7 },
+#endif
 		{ "ef",			IPTOS_DSCP_EF },
 		{ "inetcontrol",	IPTOS_PREC_INTERNETCONTROL },
 		{ "lowdelay",		IPTOS_LOWDELAY },
