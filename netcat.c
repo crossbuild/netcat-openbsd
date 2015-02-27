@@ -94,7 +94,9 @@ int	Iflag;					/* TCP receive buffer size */
 int	Oflag;					/* TCP send buffer size */
 int	Sflag;					/* TCP MD5 signature option */
 int	Tflag = -1;				/* IP Type of Service */
+#ifdef SO_RTABLE
 u_int	rtableid;
+#endif
 
 int timeout = -1;
 int family = AF_UNSPEC;
@@ -144,7 +146,12 @@ main(int argc, char *argv[])
 	sv = NULL;
 
 	while ((ch = getopt(argc, argv,
-	    "46DdhI:i:jklnO:P:p:q:rSs:tT:UuZV:vw:X:x:zC")) != -1) {
+#ifdef SO_RTABLE
+	    "46DdhI:i:jklnO:P:p:q:rSs:tT:UuZV:vw:X:x:zC"
+#else
+	    "46DdhI:i:jklnO:P:p:q:rSs:tT:UuZvw:X:x:zC"
+#endif
+	    )) != -1) {
 		switch (ch) {
 		case '4':
 			family = AF_INET;
@@ -211,12 +218,14 @@ main(int argc, char *argv[])
 			break;
 		case 'Z':
 			dccpflag = 1;
+#ifdef SO_RTABLE
 		case 'V':
 			rtableid = (unsigned int)strtonum(optarg, 0,
 			    RT_TABLEID_MAX, &errstr);
 			if (errstr)
 				errx(1, "rtable %s: %s", errstr, optarg);
 			break;
+#endif
 		case 'v':
 			vflag = 1;
 			break;
@@ -630,11 +639,13 @@ remote_connect(const char *host, const char *port, struct addrinfo hints)
 		    res0->ai_protocol)) < 0)
 			continue;
 
+#ifdef SO_RTABLE
 		if (rtableid) {
 			if (setsockopt(s, SOL_SOCKET, SO_RTABLE, &rtableid,
 			    sizeof(rtableid)) == -1)
 				err(1, "setsockopt SO_RTABLE");
 		}
+#endif
 
 		/* Bind to a local port or source address if specified. */
 		if (sflag || pflag) {
@@ -754,11 +765,13 @@ local_listen(char *host, char *port, struct addrinfo hints)
 		    res0->ai_protocol)) < 0)
 			continue;
 
+#ifdef SO_RTABLE
 		if (rtableid) {
 			if (setsockopt(s, IPPROTO_IP, SO_RTABLE, &rtableid,
 			    sizeof(rtableid)) == -1)
 				err(1, "setsockopt SO_RTABLE");
 		}
+#endif
 
 		ret = setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &x, sizeof(x));
 		if (ret == -1)
@@ -1122,9 +1135,11 @@ help(void)
 	\t-t		Answer TELNET negotiation\n\
 	\t-U		Use UNIX domain socket\n\
 	\t-u		UDP mode\n\
-	\t-Z		DCCP mode\n\
-	\t-V rtable	Specify alternate routing table\n\
-	\t-v		Verbose\n\
+	\t-Z		DCCP mode\n"
+#ifdef SO_RTABLE
+"	\t-V rtable	Specify alternate routing table\n"
+#endif
+"	\t-v		Verbose\n\
 	\t-w secs\t	Timeout for connects and final net reads\n\
 	\t-X proto	Proxy protocol: \"4\", \"5\" (SOCKS) or \"connect\"\n\
 	\t-x addr[:port]\tSpecify proxy address and port\n\
